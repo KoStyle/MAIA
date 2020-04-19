@@ -3,7 +3,7 @@
   (perspectiva (nublado soleado lluvia nieve granizo))
   (temperatura numerico)
   (humedad numerico)
-  (eclipse_sola (si no))
+  (eclipse_solar (si no))
   (nivel_de_polen (bajo medio alto))
   (lluvia_ayer (si no))
   (clase (+ -)))
