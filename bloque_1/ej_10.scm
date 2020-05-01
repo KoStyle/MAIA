@@ -28,6 +28,6 @@
 
 ;(busca-atributo 'humedad (car ejemplos) 0)
 ;(car ejemplos)
-(car(cdr ejemplos))
+;(car(cdr ejemplos))
 ;ejemplos
-(atributo 'eclipse_solar ejemplos)
+;(atributo 'eclipse_solar ejemplos)
