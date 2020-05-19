@@ -23,7 +23,7 @@
   (lambda (atrib ejemplos)
     (if (or (not (symbol? atrib)) (not (list? ejemplos)))
         '()
-        (recupera-atributo-ejemplos (busca-atributo atrib (car ejemplos) 0) (car (cdr ejemplos))))))
+        (recupera-atributo-ejemplos (busca-atributo atrib (car ejemplos) 0) (cdr ejemplos)))))
       
 
 ;(busca-atributo 'humedad (car ejemplos) 0)
