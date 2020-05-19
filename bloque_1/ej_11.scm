@@ -16,7 +16,7 @@
 ;une la cabecera de le primera lista (se supone que son iguales) con el resultado de la funcion mezclarecursiva cogiendo las listas de ejemplos de ambas listas
 (define mezclar
   (lambda (lista1 lista2)
-    (cons (list-ref lista1 0) (cons (mezcla_rec (list-ref lista1 1) (list-ref lista2 1)) '()))))
+    (cons (list-ref lista1 0) (mezcla_rec (list-tail lista1 1) (list-tail lista2 1)) )))
 
 
 
