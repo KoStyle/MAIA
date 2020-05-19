@@ -1,10 +1,13 @@
 #lang racket
 (provide (all-defined-out))
+
 (define anadir-ejemplo
   (lambda (lista ejemplo)
     (if (or (null? lista) (not (list? ejemplo)))
         '()
-        (cons (car lista) (cons (cons ejemplo (car (cdr lista))) '())))))
+        (if (null? (list-tail lista 1))
+            (cons (list-ref lista 0) (cons ejemplo '()))
+            (cons (list-ref lista 0) (anadir-ejemplo (list-tail lista 1) ejemplo))))))
 
 
 
