@@ -1,2 +1,7 @@
-(define factorial
-  (lambda (x) (if (= x 1) 1 (* (abs x) (factorial (- (abs x) 1))))))
+(define (factorial numero)
+  (if (>= numero 0)
+      (if (= numero 0)
+          1 
+          (* numero (factorial (- numero 1))))))
+
+(factorial 0)

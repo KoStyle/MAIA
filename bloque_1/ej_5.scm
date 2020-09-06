@@ -9,14 +9,15 @@
 (define encuentra_posicion
   (lambda (lista threshold acumulado)
     (set! acumulado (+ acumulado (cdr (list-ref lista 0))))
-    (if (> acumulado threshold)
+    (if (>= acumulado threshold)
         (car (list-ref lista 0))
         (encuentra_posicion (list-tail lista 1) threshold acumulado))))
 
-(define obtener-al-azar0
-  (lambda (x)
-    (encuentra_posicion x (* (random) (prob_total x)) 0)))
+(define (obtener-al-azar0 lista)
+    (encuentra_posicion lista (* (random) (prob_total lista)) 0))
 
+
+;Codigo necesario para probar la solucion
 (define elementos '())
 (do ((x 6000 (- x 1)))
   ((= x 0) elementos)

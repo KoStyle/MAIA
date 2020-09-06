@@ -1,6 +1,6 @@
-#lang racket
-(define leer-ejemplos
-  (lambda (x)
+
+(define (leer-ejemplos archivo)
+  (let ((x archivo))
     (call-with-input-file x
      (lambda (i)
        (let* ((a (read i)))
@@ -8,5 +8,7 @@
          
        
 
-;(define ejemplos (leer-ejemplos "C:\\Users\\konom\\Desktop\\IA_metodos_aprendizaje\\bloque_1\\ejemplos.scm"))
-;(car (cdr ejemplos))
+(define ejemplos (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos.scm"))
+(car (cdr ejemplos))
+
+ejemplos

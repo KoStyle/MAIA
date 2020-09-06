@@ -1,6 +1,4 @@
 #lang racket
-(provide (all-defined-out))
-
 ;obtiene la probabilidad total sumando todos los pesos de una lista de pares "(valor . peso)"
 (define prob_total
   (lambda (x)
@@ -25,22 +23,27 @@
         (cons (cons (list-ref x 0) 1) '())
         (cons (cons (list-ref x 0) 1) (convertir-a-cons (list-tail x 1))))))
 
-;Obtiene un elemento al azar de una lista (uniforme)
-(define obtener-al-azar
+(define obtener-al-azar0
   (lambda (x)
-    (when (list? (cdr(list-ref x 0)))
-      (set! x (convertir-a-cons x)))
     (encuentra_posicion x (* (random) (prob_total x)) 0)))
 
-;(obtener-al-azar '((a . 1) (b . 2) (c . 3)))
-;(obtener-al-azar '(a b c))
+;Obtiene un elemento al azar de una lista (uniforme)
+(define (obtener-al-azar lista)
+  (let ((x lista))
+    (if (not (pair? (list-ref x 0)))
+      (set! x (convertir-a-cons x))
+      (set! x x))
+    (obtener-al-azar0 x)))
 
-;(define elementos '())
-;(do ((x 6000 (- x 1)))
-;  ((= x 0) elementos)
-;  (set! elementos
-;        (cons (obtener-al-azar '(a b c)) elementos)))
+(obtener-al-azar '((a . 1) (b . 2) (c . 3)))
+(obtener-al-azar '(a b c))
+
+(define elementos '())
+(do ((x 6000 (- x 1)))
+  ((= x 0) elementos)
+  (set! elementos
+        (cons (obtener-al-azar '((a . 1) (b . 2) (c . 3))) elementos)))
 ;
-;(map (lambda (x)
-;       (cons x (count (lambda(y) (eq? x y)) elementos)))
-;     '(a b c))
+(map (lambda (x)
+       (cons x (count (lambda(y) (eq? x y)) elementos)))
+     '(a b c))

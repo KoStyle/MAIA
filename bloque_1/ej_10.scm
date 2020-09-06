@@ -1,13 +1,17 @@
-#lang racket
-(require "ej_9_inicio.scm")
+(define leer-ejemplos
+  (lambda (x)
+    (call-with-input-file x
+     (lambda (i)
+       (let* ((a (read i)))
+         a)))))
 
-(define ejemplos (leer-ejemplos "C:\\Users\\konom\\Desktop\\IA_metodos_aprendizaje\\bloque_1\\ejemplos.scm"))
+(define ejemplos (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos.scm"))
 
 (define busca-atributo
   (lambda (atrib listatrib posicion)
     (if (or (not (number? posicion)) (not (symbol? atrib)) (not (list? listatrib)))
         '()
-        (if (symbol=? (car (list-ref listatrib posicion)) atrib)
+        (if (eqv? (car (list-ref listatrib posicion)) atrib)
             posicion
             (busca-atributo atrib listatrib (+ posicion 1))))))
 
@@ -19,15 +23,15 @@
             (cons (list-ref (car ejemplos) indice) '())
             (cons (list-ref (car ejemplos) indice) (recupera-atributo-ejemplos indice (list-tail ejemplos 1)))))))
 
-(define atributo
-  (lambda (atrib ejemplos)
+(define (atributo nombre-atributo ejemplos)
+  (let ((atrib nombre-atributo))
     (if (or (not (symbol? atrib)) (not (list? ejemplos)))
         '()
         (recupera-atributo-ejemplos (busca-atributo atrib (car ejemplos) 0) (cdr ejemplos)))))
       
 
-;(busca-atributo 'humedad (car ejemplos) 0)
-;(car ejemplos)
-;(car(cdr ejemplos))
+(busca-atributo 'humedad (car ejemplos) 0)
+(car ejemplos)
+(car(cdr ejemplos))
 ;ejemplos
-;(atributo 'eclipse_solar ejemplos)
+(atributo 'perspectiva ejemplos)

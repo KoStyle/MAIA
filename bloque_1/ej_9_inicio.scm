@@ -18,8 +18,8 @@
        (let* ((a (read i)))
          a)))))
 
-;(define ejemplos (leer-ejemplos "C:\\Users\\konom\\Desktop\\IA_metodos_aprendizaje\\bloque_1\\ejemplos.scm"))
+(define ejemplos (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos.scm"))
 
-;(anadir-ejemplo ejemplos '(cacoso 1 3 45 2))
-;ejemplos
-;(car (cdr ejemplos))
+(set! ejemplos (anadir-ejemplo ejemplos '(cacoso 1 3 no alto si -)))
+ejemplos
+ejemplos
