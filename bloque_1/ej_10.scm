@@ -1,3 +1,4 @@
+#lang racket
 (define leer-ejemplos
   (lambda (x)
     (call-with-input-file x
@@ -34,4 +35,8 @@
 (car ejemplos)
 (car(cdr ejemplos))
 ;ejemplos
-(atributo 'perspectiva ejemplos)
+(atributo 'clase ejemplos)
+
+(map (lambda (x)
+       (cons x (count (lambda(y) (eq? x y)) (atributo 'clase ejemplos))))
+     '(+ -))

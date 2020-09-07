@@ -35,14 +35,14 @@
       (set! x x))
     (obtener-al-azar0 x)))
 
-(obtener-al-azar '((a . 1) (b . 2) (c . 3)))
+(obtener-al-azar '((a . 1) (b . 1) (a . 1) (b . 1) (b . 1) (b . 1)))
 (obtener-al-azar '(a b c))
 
 (define elementos '())
-(do ((x 6000 (- x 1)))
+(do ((x 1000 (- x 1)))
   ((= x 0) elementos)
   (set! elementos
-        (cons (obtener-al-azar '((a . 1) (b . 2) (c . 3))) elementos)))
+        (cons (obtener-al-azar '((a . 1) (b . 1.3) (a . 1) (b . 1.3) (b . 1.3))) elementos)))
 ;
 (map (lambda (x)
        (cons x (count (lambda(y) (eq? x y)) elementos)))

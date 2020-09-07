@@ -86,5 +86,7 @@
  (let ((x lista))
     (if (not (pair? (list-ref x 0)))
       (set! x (convertir-a-cons x))
-      (set! x x))
+      (if (not (number? (cdr (list-ref x 0))))
+          (set! x (convertir-a-cons x))
+          '()))
     (obtener-al-azar0 x)))
