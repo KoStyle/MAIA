@@ -26,13 +26,13 @@
   <codigo>)
 
 ;;Ejercicio 13
-(he-tardado <minutos> 'b2-e13)
+(he-tardado 20 'b2-e13)
 ;;<comentarios>
 (define (generalizaciones-CL concepto-CL metadatos ejemplo)
   <codigo>)
 
 ;;Ejercicio 14
-(he-tardado <minutos> 'b2-e14)
+(he-tardado 40 'b2-e14)
 ;;<comentarios>
 (define (especializaciones-CL concepto-CL metadatos ejemplo)
   <codigo>)

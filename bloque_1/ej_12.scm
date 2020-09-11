@@ -1,4 +1,6 @@
 #lang racket
+(require srfi/1)
+(require racket/trace)
 ;-----------------------------------------ej8
 (define (leer-ejemplos archivo)
   (let ((x archivo))
@@ -48,6 +50,9 @@
 
 (define ejemplos (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos.scm"))
 (define ejemplos2 (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos2.scm"))
+(define ejemplos3 (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ejemplos3.scm"))
+(define lepiota (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\agaricus-lepiota.scm"))
+(define ionosphere (leer-ejemplos "C:\\Users\\konom\\OneDrive\\Escritorio\\MAIA\\bloque_1\\ionosphere.scm"))
 
 ;-----------------------------------------ej10
 (define busca-atributo
@@ -377,7 +382,7 @@
 ;-----ej1
 
 (define (get-type x)
-  (if (list? x)
+  (if (and (list? x) (not (eqv? x '())))
       (if (symbol? (car x))
           'symbol
           (if (num-concept? x)
@@ -407,7 +412,7 @@
                       (num-concept? (list-tail concept 1))))))))
 
 (define (concepto-bien-formado? concepto)
-  (if (not (or (num-concept? (car concepto)) (symbol? (car (car concepto)))))
+  (if (not (or (eqv? (car concepto) '()) (num-concept? (car concepto)) (symbol? (car (car concepto)))))
       #f
       (if (null? (list-tail concepto 1))
           #t
@@ -416,11 +421,13 @@
 (define (validar-concepto concepto ejemplo-sin-clase)
   (if (not (concepto-bien-formado? concepto))
       #f
-      (if (not (eqv? (get-type (car concepto)) (get-type (car ejemplo-sin-clase))))
+      (if (eqv? (car concepto) '())
           #f
-          (if (null? (list-tail concepto 1))
-              #t
-              (validar-concepto (list-tail concepto 1) (list-tail ejemplo-sin-clase 1))))))
+          (if (and (not (eqv? (get-type (car concepto)) (get-type (car ejemplo-sin-clase)))) (not (eqv? (car (car concepto)) '*))) 
+              #f
+              (if (null? (list-tail concepto 1))
+                  #t
+                  (validar-concepto (list-tail concepto 1) (list-tail ejemplo-sin-clase 1)))))))
           
 
 (define (test-numerico test valor-ejemplo)
@@ -442,11 +449,13 @@
                         #t
                         #f)
                     (if (and (not iniinc) (not fininc))
-                        (if (and (<= ini valor-ejemplo) (>= fin valor-ejemplo))
+                        (if (and (< ini valor-ejemplo) (> fin valor-ejemplo))
                             #t
                             #f)
                         '()))))
-        (= ini valor-ejemplo))))
+        (if (eqv? ini '*)
+            #t
+            (= ini valor-ejemplo)))))
 
 (define (test-simbolico test valor-ejemplo)
   (if (or (eqv? (car test) valor-ejemplo) (eqv? (car test) '*))
@@ -513,12 +522,12 @@
 ;-------ej6
 (define (grado-generalidad? test)
   (if (eqv? test '())
-      '(1)
+      '(1 0)
       (let* ((x (car test)))
         (if (eqv? x '*)
-            '(3)
+            '(3 0)
             (if (symbol? x)
-                '(2)
+                '(2 0)
                 (if (num-concept? test)
                     (list 2 (length test))    ;TODO en el futuro habra que calcular un rango, o eso sospecho
                     '(-1)))))))
@@ -527,7 +536,9 @@
   (let* ((grado1 (grado-generalidad? t1))
          (grado2 (grado-generalidad? t2)))
          (if (num-concept? t1)
-             (>= (+ (car grado1) (list-ref grado1 1)) (+ (car grado2) (list-ref grado2 1)))
+             (if (not (= (car grado1) (car grado2)))
+                 (>= (car grado1) (car grado2))
+                 (>= (list-ref grado1 1) (list-ref grado2 1)))
              (>= (car grado1) (car grado2)))))
 
 
@@ -563,7 +574,7 @@
           (recupera-elemento (cdr lista) (- i 1)))))
 
 (define (gean-rec concepto-CL indice elementos)
-  (let ((a-insertar (if (symbol? (car elementos)) (list (car elementos)) (car elementos))))
+  (let ((a-insertar (if (not (list? (car elementos))) (list (car elementos)) (car elementos))))
     (if (null? (list-tail elementos 1))
         (cons (reemplaza-elemento concepto-CL a-insertar indice) '())
         (cons (reemplaza-elemento concepto-CL a-insertar indice) (gean-rec concepto-CL indice (cdr elementos))))))
@@ -604,10 +615,10 @@
          (valor (recupera-elemento ejemplo indice))
          (clase (recupera-elemento ejemplo (- (length ejemplo) 1))))
     (if (eqv? clase '-)
-        concepto-CL
+        (list concepto-CL)
         (if (not (pasa-test? test valor))
-            (reemplaza-elemento concepto-CL (generaliza-rango test valor) indice)
-            concepto-CL))))
+            (list (reemplaza-elemento concepto-CL (generaliza-rango test valor) indice))
+            (list concepto-CL)))))
 
 ;------------ej12
 (define (especializaciones-atributo-numerico concepto-CL indice ejemplo)
@@ -622,11 +633,344 @@
                 (list concepto-CL)
                 (if (= (length test) 1)
                     (gean-rec concepto-CL indice (list '()))
-                    (gean-rec concepto-CL indice (list (list (car test) valor) (list valor (car (cdr test)))))))))))
-                
-                
+                    (let* ((iniinc (list? (car test)))
+                           (fininc (list? (car (cdr test))))
+                           (ini (if iniinc (car (car test)) (car test)))
+                           (fin (if fininc (car (car (cdr test))) (car (cdr test))))
+                           (coinc-ini (= ini valor))
+                           (coinc-fin (= fin valor))
+                           (newini (if coinc-ini valor (car test)))
+                           (newfin (if coinc-fin valor (car (cdr test)))))
+                      (gean-rec concepto-CL indice (list (if (eqv? newini valor) '() (list newini valor)) (if (eqv? valor newfin) '() (list valor newfin)))))))))))
+
+;-------ej13
+(define (gene-CL-rec concepto-CL metadatos ejemplo indice)
+  (if (= (- (length ejemplo) 1) indice)
+      '()
+      (if (number? (list-ref ejemplo indice))
+          (append (list (generalizaciones-atributo-numerico concepto-CL indice ejemplo)) (gene-CL-rec concepto-CL metadatos ejemplo (+ 1 indice)))
+          (append (generalizaciones-atributo-nominal concepto-CL indice metadatos) (gene-CL-rec concepto-CL metadatos ejemplo (+ 1 indice))))))
+
+(define (generalizaciones-CL concepto-CL metadatos ejemplo)
+  (gene-CL-rec concepto-CL metadatos ejemplo 0))
+
+
+;----------ej14
+(define (espe-CL-rec concepto-CL metadatos ejemplo indice)
+  (if (= (- (length ejemplo) 1) indice)
+      '()
+      (if (number? (list-ref ejemplo indice))
+          (append (especializaciones-atributo-numerico concepto-CL indice ejemplo) (espe-CL-rec concepto-CL metadatos ejemplo (+ 1 indice)))
+          (append (especializaciones-atributo-nominal concepto-CL indice metadatos) (espe-CL-rec concepto-CL metadatos ejemplo (+ 1 indice))))))
+
+(define (especializaciones-CL concepto-CL metadatos ejemplo)
+  (espe-CL-rec concepto-CL metadatos ejemplo 0))
+;;Ejercicio 15
+
+(define (egs-test-positives PSET H)
+  (if (null? PSET)
+      #t
+      (if (not (match-CL H (drop-right (car PSET) 1)))
+          #f
+          (egs-test-positives (cdr PSET) H))))
+
+(define (egs-test-negatives NSET H)
+  (if (null? NSET)
+      #t
+      (if (match-CL H (drop-right (car NSET) 1))
+          #f
+          (egs-test-negatives (cdr NSET) H))))
+
+(define (count-matches H SET COUNT)
+  (if (null? SET)
+      COUNT
+      (if (match-CL H (drop-right (car SET) 1))
+          (count-matches H (cdr SET) (+ 1 COUNT))
+          (count-matches H (cdr SET) COUNT))))
+
+
+(define (egs-generate-specs H metadata NSET)
+  (if (null? NSET)
+     '()
+     (append (delete-duplicates (delete H (especializaciones-CL H metadata (car NSET)))) (egs-generate-specs H metadata (cdr NSET)))))
+  
+  
+  
+
+(define (eval-hset HSET PSET NSET CSET VALIDHSET)
+  (if (null? HSET)
+    (list CSET VALIDHSET)
+    (let* ((H (car HSET))
+           (allposi (egs-test-positives PSET H))
+           (allnega (egs-test-negatives NSET H)))
+           (if (not allposi)
+               (eval-hset (cdr HSET) PSET NSET CSET VALIDHSET)
+               (if allnega
+                   (eval-hset (cdr HSET) PSET NSET (cons H CSET) VALIDHSET)
+                   (eval-hset (cdr HSET) PSET NSET CSET (cons H VALIDHSET)))))))
+
+(define (compara-generalidad>= H SET)
+  (if (null? SET)
+      #t
+      (if (not (concepto-CL>= H (car SET)))
+          #f
+          (compara-generalidad>= H (cdr SET)))))
+
+(define (egs-valid-specs SPECS CSET)
+  (if (null? SPECS)
+      '()
+      (if (compara-generalidad>= (car SPECS) CSET)
+          (cons (car SPECS) (egs-valid-specs (cdr SPECS) CSET))
+          (egs-valid-specs (cdr SPECS) CSET))))
+
+(define (generate-newset HSET NSET CSET metadata)
+  (if (null? HSET)
+      '()
+      (let* ((H (car HSET))
+             (NEWSET (egs-valid-specs (egs-generate-specs H metadata NSET) CSET)))
+        (delete-duplicates NEWSET))))
+
+(define (generate-exclusive-newset-rec HSET NEWSET)
+  (if (null? HSET)
+      NEWSET
+      (let ((NEWSET+ (delete (car HSET) NEWSET)))
+        (generate-exclusive-newset-rec (cdr HSET) NEWSET+))))
+
+(define (generate-exclusive-newset HSET NSET CSET metadata)
+  (let* ((NEWSET (generate-newset HSET NSET CSET metadata)))
+    (generate-exclusive-newset-rec HSET NEWSET)))
+
+(define (get-PSET ejemplos)
+  (if (null? ejemplos)
+      '()
+      (if  (eqv? (list-ref (car ejemplos) (- (length (car ejemplos)) 1)) '+)
+           (cons (car ejemplos) (get-PSET (cdr ejemplos)))
+           (get-PSET (cdr ejemplos)))))
+
+(define (get-NSET ejemplos)
+  (if (null? ejemplos)
+      '()
+      (if  (eqv? (list-ref (car ejemplos) (- (length (car ejemplos)) 1)) '-)
+           (cons (car ejemplos) (get-NSET (cdr ejemplos)))
+           (get-NSET (cdr ejemplos)))))
+
+
+
+    
+(define (EGS0 PSET NSET CSET HSET)
+  (let* ((CHSET (eval-hset HSET (cdr PSET) (cdr NSET) CSET '()))
+         (CSET+ (car CHSET))
+         (HSET+ (car (cdr CHSET))))
+    (if (null? HSET+)
+        CSET+
+        (let ((NEWSET (generate-exclusive-newset HSET+ (cdr NSET) CSET+ (car PSET))))
+          (EGS0 PSET NSET CSET+ NEWSET)))))
+
+(define (EGS ejemplos)
+  (let* ((metadata (car ejemplos))
+         (PSET (cons metadata (get-PSET ejemplos)))
+         (NSET (cons metadata (get-NSET ejemplos)))
+         (HSET (list (concepto-CL-mas-general (car ejemplos))))
+         (CSET (EGS0 PSET NSET '() HSET)))
+    (if (not (null? CSET)) (obtener-al-azar CSET) '())))
+    
+
+;---------ej17
+
+;(define (count-matches SET H count)
+;  (if (null? SET)
+;      count
+;      (if (not (match-CL H (drop-right (car SET) 1)))
+;          (count-matches (cdr SET) count)
+;          (count-matches (cdr SET) (+ count 1)))))
+
+
+(define (score-CL concepto-CL PSET NSET)
+ (let* ((PSETsc (cdr PSET))
+        (NSETsc (cdr NSET))
+        (metadata (car PSET))
+        (pmatches (count-matches concepto-CL PSETsc 0))
+        (nunmatches (- (length NSETsc) (count-matches concepto-CL NSETsc 0)))
+        (total-ejem (+ (length NSETsc) (length PSETsc))))
+   (/ (+ pmatches nunmatches) total-ejem)))
+
+;-----------ej18
+
+(define (generate-OPEN-SET CSET S OSET PSET NSET CSETOUT)
+  (if (null? CSET)
+      (list CSETOUT (cons S OSET))
+      (let* ((C (car CSET)))
+        (if (<= (cmp-concepto-CL S C) 0)
+            (if (< (score-CL S PSET NSET) (score-CL C PSET NSET))
+                (list CSETOUT OSET)
+                (generate-OPEN-SET (cdr CSET) S OSET PSET NSET CSETOUT))
+            (generate-OPEN-SET (cdr CSET) S OSET PSET NSET (cons C CSETOUT))))))
+
+(define (generate-OSET CSET NEWSET OSET PSET NSET)
+  (if (null? NEWSET)
+      (list CSET OSET)
+      (let* ((COSET (generate-OPEN-SET CSET (car NEWSET) OSET PSET NSET '()))
+             (OSET+ (list-ref COSET 1))
+             (CSET+ (car COSET)))
+        (generate-OSET CSET+ (cdr NEWSET) OSET+ PSET NSET))))
+
+(define (eval-SPECS SPECS H PSET NSET NEWSET)
+  (if (null? SPECS)
+      NEWSET
+      (if (> (score-CL (car SPECS) PSET NSET) (score-CL H PSET NSET))
+          (eval-SPECS (cdr SPECS) H PSET NSET (cons (car SPECS) NEWSET))
+          (eval-SPECS (cdr SPECS) H PSET NSET NEWSET))))
+
+(define (eval-H HSET PSET NSET OSET CSET)
+  (if (null? HSET)
+      (list OSET CSET)
+      (let* ((H (car HSET))
+             (metadata (car PSET))
+             (PSETsc (cdr PSET))
+             (NSETsc (cdr NSET))
+             (SPECS (delete-duplicates (egs-generate-specs H metadata NSETsc)))   ;TODO maybe otros H presentes en SPECS, habria que limpiar TODOS los H cada vez que se hace el bucle?
+             (NEWSET (eval-SPECS SPECS H PSET NSET '())))
+        (if (eqv? NEWSET '())
+            (eval-H (cdr HSET) PSET NSET OSET (cons H CSET))
+            (let* ((COSET (generate-OSET CSET NEWSET OSET PSET NSET))
+                   (CSET+ (car COSET))
+                   (OSET+ (list-ref COSET 1)))
+              (eval-H (cdr HSET) PSET NSET OSET+ CSET+))))))
+                  
+(define (get-best-beam BESTSET beamsize)
+  (if (or (= 0 beamsize) (null? BESTSET))
+      '()
+      (cons (car BESTSET) (get-best-beam (cdr BESTSET) (- beamsize 1)))))
+
+(define (HGS0 PSET NSET CSET HSET)
+  (let* ((OCSET (eval-H HSET PSET NSET '() '()))
+         (OSET (delete-duplicates (car OCSET)))
+         (CSET+ (delete-duplicates (list-ref OCSET 1)))
+         (BESTSET (sort (append OSET CSET+) (lambda (c1 c2) (>= (score-CL c1 PSET NSET) (score-CL c2 PSET NSET)))))
+         (BSSET (get-best-beam BESTSET 3))
+         (BCSET (generate-exclusive-newset-rec OSET BSSET))
+         (BOSET (generate-exclusive-newset-rec CSET+ BSSET)))
+    (if (null? OSET)
+        (if (null? BSSET)
+            '()
+            (car BSSET))
+        (HGS0 PSET NSET BCSET BOSET))))
+
+(define (HGS ejemplos)
+  (let* ((metadata (car ejemplos))
+         (PSET (cons metadata (get-PSET ejemplos)))
+         (NSET (cons metadata (get-NSET ejemplos)))
+         (HSET (list (concepto-CL-mas-general (car ejemplos))))
+         (CSET (HGS0 PSET NSET '() HSET)))
+    (if (not (null? CSET)) CSET '())))
+
+
+;--------ej20
+(define (pasa-concepto-TC? concepto ejemplo-sin-clase correctos)
+  (if (null? concepto)
+      correctos
+  (if (not (pasa-test? (car concepto) (car ejemplo-sin-clase)))
+      (pasa-concepto-TC? (list-tail concepto 1) (list-tail ejemplo-sin-clase 1) correctos)
+      (pasa-concepto-TC? (list-tail concepto 1) (list-tail ejemplo-sin-clase 1) (+ 1 correctos)))))
+
+(define (match-TC concepto-TC ejemplo-sin-clase)
+  (if (or (not (= (length (cdr concepto-TC)) (length ejemplo-sin-clase))) (not (number? (car concepto-TC))))
+      #f
+      (if (not (validar-concepto (cdr concepto-TC) ejemplo-sin-clase))
+          #f
+          (>= (pasa-concepto-TC? (cdr concepto-TC) ejemplo-sin-clase 0) (car concepto-TC)))))
+
+;---------------ej21
+
+(define (TCi concepto-TC ejemplo-sin-clase)
+  (if (match-TC concepto-TC ejemplo-sin-clase)
+      (append ejemplo-sin-clase '(+))
+      (append ejemplo-sin-clase '(-))))
+
+
+;--------------ej22
+(define (especializacion-umbral concepto-TC)
+  (let* ((len (length (cdr concepto-TC)))
+         (umb (car concepto-TC))
+         (newumb (if (< umb len) (+ 1 umb) umb)))
+    (if (= newumb len)
+        '()
+        (list (cons newumb (cdr concepto-TC))))))
+
+(define (espe-TC-rec concepto-TC metadatos ejemplo indice)
+  (if (= (- (length ejemplo) 1) indice)
+      '()
+      (if (= -1 indice)
+          (append (especializacion-umbral concepto-TC) (map (lambda (x) (cons (car concepto-TC) x)) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice))))
+          (if (number? (list-ref ejemplo indice))
+              (append (especializaciones-atributo-numerico (cdr concepto-TC) indice ejemplo) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice)))
+              (append (especializaciones-atributo-nominal (cdr concepto-TC) indice metadatos) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice)))))))
+
+(define (especializaciones-TC concepto-TC metadatos ejemplo)
+  (espe-TC-rec concepto-TC metadatos ejemplo -1))
+
+;----------ej23
+(define (traducir meta-atributo valor)
+  (if (symbol? (list-ref meta-atributo 1))
+      valor
+      (index-of (list-ref meta-atributo 1) valor)))
+
+;------------ej24
+(define (nuevo-conceptoUU-rec metadatos init)
+  (if (null? metadatos)
+      '()
+      (cons (* init (- (* 2 (random)) 1)) (nuevo-conceptoUU-rec (cdr metadatos) init))))
+
+(define (nuevo-conceptoUU metadatos init)
+  (cons metadatos (nuevo-conceptoUU-rec metadatos init)))
 
 (define megaejemplos (mezclar ejemplos ejemplos2))
+(define PSET (get-PSET megaejemplos))
+(define NSET (get-NSET megaejemplos))
+(define HSET (list (concepto-CL-mas-general (car ejemplos))))
+(define H (car HSET))
+(define metadatos (car ejemplos))
+(define PSETcc (cons (car ejemplos) PSET))
+(define NSETcc (cons (car ejemplos) NSET))
+(define SPECS (delete-duplicates (egs-generate-specs (car HSET) (car ejemplos) NSET)))
+(define NEWSET2 (eval-SPECS SPECS (car HSET) PSETcc NSETcc '()))
+;(score-CL (car HSET) PSETcc NSETcc)
+;(list-ref SPECS 1)
+;(score-CL (list-ref SPECS 1) PSETcc NSETcc)
+;(match-TC '(4 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
+;(match-TC '(3 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
+;(match-TC '(2 (soleado)(*)(10 (40))(si)) '(soleado 30 40 si))
+;(match-TC '(4 (soleado)(*)(10 40)(si)) '(soleado 30 25 no))
+;(match-TC '(3 (soleado)(*)(10 40)(si)) '(30 soleado 25 si))
+;
+;(TCi '(4 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
+;(TCi '(3 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
+;(TCi '(2 (soleado)(*)(10 (40))(si)) '(soleado 30 40 si))
+;(TCi '(4 (soleado)(*)(10 40)(si)) '(soleado 30 25 no))
+;(TCi '(3 (soleado)(*)(10 40)(si)) '(30 soleado 25 si))
+;(car (cdr ejemplos))
+;(cons (length H) H)
+;(especializaciones-TC (cons 4 H) metadatos (car (cdr ejemplos)))
+
+;(traducir '(perspectiva (soleado nublado lluvioso)) 'lluvioso)
+;(traducir '(perspectiva numerico) '15)
+(nuevo-conceptoUU metadatos 3)
+
+;lepiota
+;ionosphere
+(trace HGS0)
+;(HGS ionosphere)
+;PSET
+;NSET
+;HSET
+;(length (generate-exclusive-newset HSET NSET '() (car megaejemplos)))
+;(car (cdr (eval-hset (egs-generate-specs (car HSET) (car megaejemplos) NSET) PSET NSET '() '())))
+(define HSET+ (car (cdr (eval-hset (generate-exclusive-newset HSET NSET '() (car megaejemplos)) PSET NSET '() '()))))
+(define NEWSET (generate-exclusive-newset HSET+ NSET '() (car megaejemplos)))
+;HSET
+;HSET+
+;NEWSET
+;(eval-hset NEWSET PSET NSET '() '())
 ;(define esencia (IA1 ejemplos))
 ;(define ejemplos-sin-clase (map (lambda(x) (drop-right x 1)) (list-tail ejemplos 1)))
 ;(define extension (map (lambda(x) (A1i esencia x)) ejemplos-sin-clase))
@@ -634,13 +978,17 @@
 
 
 ;(especializaciones-atributo-nominal '(() ((24) (25)) (80) (no) (medio) (no)) 0 (car ejemplos))
-(generalizaciones-atributo-nominal '(() ((24) (25)) (80) (no) (medio) (no)) 0 (car ejemplos))
+;(generalizaciones-atributo-nominal '(() ((24) (25)) (80) (no) (medio) (no)) 0 (car ejemplos))
+;(generalizaciones-CL '((*) (24) (80) (no) (medio) (no)) (car ejemplos) '(nublado 25 89 no medio no +))
+
+;(especializaciones-CL '((*) ((24) 30) (80) (no) (medio) (no)) (car ejemplos) '(nublado 24 89 no medio no -))
+
 
 
 ;(num-concept? '(1 +inf.0))
 ;(pasa-test? '((1) +inf.0) 1)
-(car (cdr ejemplos))
-(pasa-test? '((24) 25) 25)
+;(car (cdr ejemplos))
+;(pasa-test? '((24) 25) 25)
 ;(generalizaciones-atributo-numerico '((nublado) (0 60) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no +))
 ;(especializaciones-atributo-numerico '((nublado) (25) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no -))
 ;(especializaciones-atributo-numerico '((nublado) (0 60) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no -))
@@ -703,17 +1051,3 @@
 ;(leave-one-out A0 A0i ejemplos)
 ;(define concepto '((+ . 0) (- . 0)))
 ;(IIA1 (car ejemplos) concepto (car (cdr ejemplos2)))
-
-;ejemplos
-
-;(separar 0.33 ejemplos)
-
-;(atributo 'clase ejemplos)
-
-
-
-;(ratio-clases '(+ -) ejemplos)
-
-;(stratify 6 ejemplos)
-
-;(folds 3 ejemplos)
