@@ -372,7 +372,7 @@
  (cross-validation-generic algoritmo interprete ejemplos n folds))
 ;;<comentarios stratified-cross-validation>
 (define (stratified-cross-validation algoritmo interprete ejemplos n)
-(cross-validation-generic algoritmo interprete ejemplos n stratify))
+  (cross-validation-generic algoritmo interprete ejemplos n stratify))
 
 
 ;--------------------------------------
@@ -648,7 +648,7 @@
   (if (= (- (length ejemplo) 1) indice)
       '()
       (if (number? (list-ref ejemplo indice))
-          (append (list (generalizaciones-atributo-numerico concepto-CL indice ejemplo)) (gene-CL-rec concepto-CL metadatos ejemplo (+ 1 indice)))
+          (append (generalizaciones-atributo-numerico concepto-CL indice ejemplo) (gene-CL-rec concepto-CL metadatos ejemplo (+ 1 indice)))
           (append (generalizaciones-atributo-nominal concepto-CL indice metadatos) (gene-CL-rec concepto-CL metadatos ejemplo (+ 1 indice))))))
 
 (define (generalizaciones-CL concepto-CL metadatos ejemplo)
@@ -727,7 +727,7 @@
   (if (null? HSET)
       '()
       (let* ((H (car HSET))
-             (NEWSET (egs-valid-specs (egs-generate-specs H metadata NSET) CSET)))
+             (NEWSET (append (egs-valid-specs (egs-generate-specs H metadata NSET) CSET) (generate-newset (cdr HSET) NSET CSET metadata))))
         (delete-duplicates NEWSET))))
 
 (define (generate-exclusive-newset-rec HSET NEWSET)
@@ -889,25 +889,26 @@
 
 
 ;--------------ej22
-(define (especializacion-umbral concepto-TC)
+(define (especializacion-umbral concepto-TC metadatos ejemplo)
   (let* ((len (length (cdr concepto-TC)))
          (umb (car concepto-TC))
-         (newumb (if (< umb len) (+ 1 umb) umb)))
+         (newumb (if (< umb len) (+ 1 umb) umb))
+         (minusumb (if (<= umb 0) 0 (- umb 1))))
     (if (= newumb len)
         '()
-        (list (cons newumb (cdr concepto-TC))))))
+        (append (list (cons newumb (cdr concepto-TC))) (map (lambda (x) (cons minusumb x)) (especializaciones-CL (cdr concepto-TC) metadatos ejemplo))))))
 
 (define (espe-TC-rec concepto-TC metadatos ejemplo indice)
   (if (= (- (length ejemplo) 1) indice)
       '()
       (if (= -1 indice)
-          (append (especializacion-umbral concepto-TC) (map (lambda (x) (cons (car concepto-TC) x)) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice))))
+          (append (especializacion-umbral concepto-TC metadatos ejemplo) (map (lambda (x) (cons (car concepto-TC) x)) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice))))
           (if (number? (list-ref ejemplo indice))
               (append (especializaciones-atributo-numerico (cdr concepto-TC) indice ejemplo) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice)))
               (append (especializaciones-atributo-nominal (cdr concepto-TC) indice metadatos) (espe-TC-rec concepto-TC metadatos ejemplo (+ 1 indice)))))))
 
 (define (especializaciones-TC concepto-TC metadatos ejemplo)
-  (espe-TC-rec concepto-TC metadatos ejemplo -1))
+  (delete-duplicates (espe-TC-rec concepto-TC metadatos ejemplo -1)))
 
 ;----------ej23
 (define (traducir meta-atributo valor)
@@ -922,7 +923,423 @@
       (cons (* init (- (* 2 (random)) 1)) (nuevo-conceptoUU-rec (cdr metadatos) init))))
 
 (define (nuevo-conceptoUU metadatos init)
-  (cons metadatos (nuevo-conceptoUU-rec metadatos init)))
+  (list metadatos (nuevo-conceptoUU-rec metadatos init)))
+
+;---------------ej25
+(define (traducir-ejemplo-sin-clase metadatos ejemplo-sin-clase)
+  (if (null? ejemplo-sin-clase)
+      '()
+      (cons (traducir (car metadatos) (car ejemplo-sin-clase)) (traducir-ejemplo-sin-clase (cdr metadatos) (cdr ejemplo-sin-clase)))))
+
+(define (multiply-lists list1 list2)
+  (if (null? list1)
+      '()
+      (cons (* (car list1) (car list2)) (multiply-lists (cdr list1)(cdr list2)))))
+
+(define (sum-list elemList)
+  (if
+    (null? elemList)
+    0
+    (+ (car elemList) (sum-list (cdr elemList)))
+  )
+)
+
+(define (match-LUU conceptoUU ejemplo-sin-clase)
+  (let* ((eje-traducido (traducir-ejemplo-sin-clase (car conceptoUU) ejemplo-sin-clase))
+         (multiplic (multiply-lists (car (cdr conceptoUU)) (append eje-traducido '(1))))
+         (suma (sum-list (drop-right multiplic 1)))
+         (umbral (list-ref multiplic (- (length multiplic) 1))))
+    (if (>= suma (- umbral))
+        #t
+        #f)))
+
+;----------ej26
+(define (LUUi conceptoUU ejemplo-sin-clase)
+  (if (match-LUU conceptoUU ejemplo-sin-clase)
+      (append ejemplo-sin-clase '(+))
+      (append ejemplo-sin-clase '(-))))
+
+;------------ej27
+(define (count-matches-TC H SET COUNT)
+  (if (null? SET)
+      COUNT
+      (if (match-TC H (drop-right (car SET) 1))
+          (count-matches-TC H (cdr SET) (+ 1 COUNT))
+          (count-matches-TC H (cdr SET) COUNT))))
+
+(define (score-TC concepto-TC PSET NSET)
+ (let* ((PSETsc (cdr PSET))
+        (NSETsc (cdr NSET))
+        (metadata (car PSET))
+        (pmatches (count-matches-TC concepto-TC PSETsc 0))
+        (nunmatches (- (length NSETsc) (count-matches-TC concepto-TC NSETsc 0)))
+        (total-ejem (+ (length NSETsc) (length PSETsc))))
+   (/ (+ pmatches nunmatches) total-ejem)))
+
+;------------ej28
+(define (find-counter lista elemento)
+  (if (null? lista)
+      '()
+      (if (eqv? (car (car lista) elemento))
+          (car lista)
+          (find-counter (cdr lista) elemento))))
+
+(define (get-index-counter lista elemento index)
+  (if (>= index (length lista))
+      -1
+      (if (eqv? (car (list-ref lista index)) elemento)
+          index
+          (get-index-counter lista elemento (+ 1 index)))))
+
+(define (create-counter element lista n)
+  (if (null? lista)
+      (cons element n)
+      (if (eqv? (car lista) element)
+          (create-counter element (cdr lista) (+ 1 n))
+          (create-counter element (cdr lista) n))))
+
+(define (contador>? c1 c2)
+  (if (null? c2)
+      #t
+      (> (cdr c1) (cdr c2))))
+
+(define (get-moda lista contadores posicion)
+  (if (>= posicion (length lista))
+      (car (car (sort contadores contador>?)))
+      (let* ((elem (list-ref lista posicion))
+             (indice-elem (get-index-counter contadores elem 0))
+             (contador (if (>= indice-elem 0) (list-ref contadores indice-elem) (create-counter elem lista 0))))
+        (if (< indice-elem 0)
+            (get-moda lista (cons contador contadores) (+ 1 posicion))
+            (get-moda lista contadores (+ 1 posicion))))))
+
+
+;(define (HTC0 PSET NSET CSET HSET)
+;  <codigo>)
+
+
+;---------ej30
+(define (PRM concepto-UU ejemplos)
+  (if (null? ejemplos)
+      concepto-UU
+      (let* ((ejemplos+ (if (list? (car (car ejemplos))) (cdr ejemplos) ejemplos)) ;eliminamos la cabecera si la hay
+             (I (car ejemplos+))
+             (I-sin-clase (drop-right I 1))
+             (I-sc-trad (traducir-ejemplo-sin-clase (car concepto-UU) I-sin-clase))
+             (C (list-ref I (- (length I) 1)))
+             (P (list-ref (LUUi concepto-UU I-sin-clase) (- (length I) 1)))
+             (S (if (and (eqv? P '-) (eqv? C '+)) 1 (if (and (eqv? P '+) (eqv? C '-)) -1 0))))
+        (if (not (eqv? C P))
+            (let ((newconcept  (list (car concepto-UU) (map (lambda (w v) (+ w (* v S 0.4))) (cadr concepto-UU) (append I-sc-trad '(1)))))) ;Actualizamos los pesos de la hipotesis
+              (PRM newconcept (cdr ejemplos+)))
+            (PRM concepto-UU (cdr ejemplos+))))))
+
+
+;--------------ej31
+
+(define (all-classified? H ejemplos)
+  (if (null? ejemplos)
+      #t
+      (let* ((I (car ejemplos))
+             (C (list-ref I (- (length I) 1)))
+             (P (list-ref (LUUi H (drop-right I 1)) (- (length I) 1))))
+        (if (not (eqv? C P))
+            #f
+            (all-classified? H (cdr ejemplos))))))
+
+(define COUNT 1000)
+(define COUNT2 0)
+(define (PCP-loop H ejemplos-sc)
+  (if (<= COUNT2 0)
+      H
+      (let* ((bien-clasificado (all-classified? H ejemplos-sc)))
+        (if bien-clasificado
+            H
+            (let ()
+              (set! COUNT2 (- COUNT2 1))
+              (PCP-loop (PRM H ejemplos-sc) ejemplos-sc))))))
+
+(define (PCP ejemplos)
+  (let* ((metadatos (car ejemplos))
+         (ejemplos-sc (cdr ejemplos))
+         (H (nuevo-conceptoUU metadatos 1)))
+    (set! COUNT2 COUNT)
+    (PCP-loop H ejemplos-sc)))
+
+
+;------------------ej32
+
+;Si el valor devuelto > 0 la clase es positiva, si es < 0 es negativa
+(define (predict-LUU conceptoUU ejemplo-sin-clase)
+  (let* ((eje-traducido (traducir-ejemplo-sin-clase (car conceptoUU) ejemplo-sin-clase))
+         (multiplic (multiply-lists (car (cdr conceptoUU)) eje-traducido))
+         (suma (sum-list multiplic)))
+    (/ 1 (+ 1 (exp (/ (- suma) 4)))))) ;Funcion sigmoide. Temos que hacer Umbral (siempre 0.5, en el interpretre) menos el resto. Al sumar todo de golpe nosotros hacemos el resto-umbra, deahi el cambio de signo
+
+
+(define (calcular-SSE-LUU H ISET SSEacumulado)
+  (if (null? ISET)
+      SSEacumulado
+      (let* ((I (car ISET))
+             (C (list-ref I (- (length I) 1)))
+             (O (if (eqv? C '+) 1 0))
+             (P (predict-LUU H (drop-right I 1)))
+             (SSE+ (+ SSEacumulado (expt (- O P) 2))))
+        (calcular-SSE-LUU H (cdr ISET) SSE+))))
+
+(define (calcular-vector-gradiente H ISET grad)
+  (if (null? ISET)
+      grad
+      (let* ((I (car ISET)) 
+             (I-sc (drop-right I 1)) ;ejemplo sin clase
+             (I-sc-trad (traducir-ejemplo-sin-clase (car H) I-sc)) ;ejemplo traducido
+             (C (list-ref I (- (length I) 1))) ;literal de la clase
+             (O (if (eqv? C '+) 1 0)) ;observed class (1 para positivo 0 negativo)
+             (P (predict-LUU H I-sc)) ;predicted class(salida de una sigmoide entre 1 y 0)
+             (ita 0.05)   ;learning factor
+             (e (* P (- 1 P) (- O P))) ;error
+             (grad-parcial (map (lambda (x) (* ita e x)) I-sc-trad))
+             (nueva-grad (map (lambda (x y) (+ x y)) grad-parcial grad)))
+        (calcular-vector-gradiente H (cdr ISET) nueva-grad))))
+
+(define (LMS-loop H ISET vec-delta-old)
+  (if (<= COUNT2 0)
+      H
+      (let* ((min-err 0.01)  ;En terminos de MSE
+             (MSE (/ (calcular-SSE-LUU H ISET 0) (length ISET)))
+             (alfa 0.05))
+        (if (< MSE min-err)
+            H
+            (let* ((GRAD (calcular-vector-gradiente H ISET (build-list (length (cadr H)) (lambda (x) 0.0))))
+                   (vec-delta-new (map (lambda (x y) (+ x (* alfa y))) GRAD vec-delta-old))  ;Se calcula el nuevo vector del ta segun la gradiente y la inercia
+                   (H+ (list (car H) (map (lambda (x y) (+ x y)) (cadr H) vec-delta-new))))  ;Se actualiza la hipotesis con el nuevo vector delta
+              (set! COUNT2 (- COUNT2 1))
+              (LMS-loop H+ ISET vec-delta-new))))))
+        
+
+
+(define (LMS ejemplos)
+  (let* ((metadatos (car ejemplos))
+         (ejemplos-sc (cdr ejemplos))
+         (H (nuevo-conceptoUU metadatos 0.2))
+         (H+ (list (car H) (drop-right (cadr H) 1))) ;eliminamos el umbral, está definido de forma constante en la sigmoide
+         (vec-delta-anterior (build-list (length (cadr H+)) (lambda (x) 0.0))))
+    (set! COUNT2 COUNT)
+    (let ((Hnew (LMS-loop H+ ejemplos-sc vec-delta-anterior)))
+      (list (car Hnew) (append (cadr Hnew) '(-0.5))))))
+         
+(define (LUUi-LMS conceptoUU ejemplo-sin-clase)
+  (if (> (predict-LUU conceptoUU ejemplo-sin-clase) 0.5)
+      (append ejemplo-sin-clase '(+))
+      (append ejemplo-sin-clase '(-))))
+;------------ej34
+
+(define (distancia-valor valor1 valor2)
+  (if (and (number? valor1) (number? valor2))
+      (- valor1 valor2)
+      (if (eqv? valor1 valor2)
+          0
+          1)))
+
+
+(define (distancia-rec ej1 ej2)
+  (if (null? ej1)
+      0
+      (+ (expt (distancia-valor (car ej1) (car ej2)) 2) (distancia-rec (cdr ej1) (cdr ej2)))))
+
+(define (distancia ejemplo-sin-clase ejemplo)
+  (let* ((ejsc ejemplo-sin-clase)
+         (ej2 (if (< (length ejsc) (length ejemplo)) (drop-right ejemplo 1) ejemplo)))
+    (sqrt (distancia-rec ejsc ej2))))
+
+
+;----------------ej35
+
+(define (IBi-rec concepto-sc ejsc vecino-hasta-ahora)
+  (if (null? concepto-sc)
+      (append ejsc (list-tail vecino-hasta-ahora (- (length vecino-hasta-ahora) 1)))
+      (let* ((vecino-actual (if (eqv? '() vecino-hasta-ahora) (car concepto-sc) vecino-hasta-ahora))
+             (vecino-maybe (car concepto-sc))
+             (distancia-actual (distancia ejsc vecino-actual))
+             (distancia-maybe (distancia ejsc vecino-maybe)))
+        (if (< distancia-maybe distancia-actual)
+            (IBi-rec (cdr concepto-sc) ejsc vecino-maybe)
+            (IBi-rec (cdr concepto-sc) ejsc vecino-actual)))))
+
+(define (IBi concepto-IB ejemplo-sin-clase)
+  (if (list? (car (car concepto-IB)))
+      (IBi-rec (cdr concepto-IB) ejemplo-sin-clase '())  ;quitamos la cabecera si la tiene
+      (IBi-rec concepto-IB ejemplo-sin-clase '())))
+
+
+;-----------ej36
+(define (match-IB concepto-IB ejemplo-sin-clase)
+  (let ((resultado (IBi concepto-IB ejemplo-sin-clase)))
+    (if (eqv? (list-ref resultado (- (length resultado) 1)) '-)
+        #f
+        #t)))
+
+;--------ej37
+(define (nuevo-conceptoNB metadatos)
+  (do ((cuentas '(0))
+       (valores '())
+       (i 0 (+ i 1))
+       )
+    ((= i (- (length metadatos) 1))
+     (let ((c (reverse cuentas)))
+       (list (cons '+ c)(cons '- c)));valor devuelto
+     )
+    (set! valores (cadr (list-ref metadatos i)))
+    (cond
+      ((eq? valores 'numerico)
+       (set! cuentas (cons '(numerico 0 0) cuentas)))
+      (else ;nominales
+       (set! cuentas
+             (cons (map (lambda(x) (cons x 0))
+                        valores)
+                   cuentas)))
+      )))
+
+
+(define (actualiza-atributo-NB-nominal atributo-NB valor)
+  (if (null? atributo-NB)
+      '()
+      (if (eqv? (car (car atributo-NB)) valor)
+          (cons (cons (caar atributo-NB) (+ 1 (cdr (car atributo-NB)))) (cdr atributo-NB))
+          (cons (car atributo-NB) (actualiza-atributo-NB-nominal (cdr atributo-NB) valor)))))
+
+(define (actualiza-atributo-NB-numerico atributo-NB valor)
+  (list 'numerico (+ (list-ref atributo-NB 1) valor) (+ (list-ref atributo-NB 2) (expt valor 2))))
+
+(define (actualiza-clase-NB clase-NB ejemplo-sc)
+  (if (null? clase-NB)
+      '()
+      (if (number? (car clase-NB))
+          (cons (+ (car clase-NB) 1) (actualiza-clase-NB (cdr clase-NB) ejemplo-sc))
+          (if (symbol? (car clase-NB))
+              (cons (car clase-NB) (actualiza-clase-NB (cdr clase-NB) ejemplo-sc))
+              (if (eqv? (caar clase-NB) 'numerico)
+                  (cons (actualiza-atributo-NB-numerico (car clase-NB) (car ejemplo-sc)) (actualiza-clase-NB (cdr clase-NB) (cdr ejemplo-sc)))
+                  (cons (actualiza-atributo-NB-nominal (car clase-NB) (car ejemplo-sc)) (actualiza-clase-NB (cdr clase-NB) (cdr ejemplo-sc))))))))
+  
+
+(define (INB concepto-NB ejemplo)
+  (if (null? concepto-NB)
+      '()
+      (let* ((cnb (car concepto-NB))
+             (clase (list-ref ejemplo (- (length ejemplo) 1))))
+        (if (eqv? (car cnb) clase)
+            (cons (actualiza-clase-NB cnb (drop-right ejemplo 1)) (cdr concepto-NB))
+            (cons cnb (INB (cdr concepto-NB) ejemplo))))))
+
+;-----------Ej38
+
+(define (NB-rec CNB ejemplos-scab)
+  (if (null? ejemplos-scab)
+      CNB
+      (NB-rec (INB CNB (car ejemplos-scab)) (cdr ejemplos-scab))))
+(define (NB ejemplos)
+  (let* ((metadatos (car ejemplos))
+         (ejemplos-scab (cdr ejemplos))
+         (conceptoNB (nuevo-conceptoNB metadatos)))
+    (NB-rec conceptoNB ejemplos-scab)))
+
+;------ej39
+;Divide el sumatorio de elemento x entre n
+(define (media x n)
+ (/ x n))
+
+(define (varinza x2 m n)
+  (- (/ x2 n) (expt m 2)))
+
+;-------------------ej40
+
+(define (probabilidad-num atrib n valor)
+  (let* ((med (media (list-ref atrib 1) n))
+         (var (varinza (list-ref atrib 2) (list-ref atrib 1) n))
+         (exponente (/ (- (expt (- valor med) 2)) (* 2 var)))
+         (denom (sqrt (* 2 pi var)))
+         (prob (* (/ 1 denom) (exp exponente))))
+    prob))
+
+(define (probabilidad-nom atrib n valor)
+  (if (null? atrib)
+      0
+      (if (eqv? (caar atrib) valor)
+          (/ (cdar atrib) n)
+          (probabilidad-nom (cdr atrib) n valor))))
+
+(define (prob-atrib atrib n valor)
+  (if (number? valor)
+      (probabilidad-num atrib n valor)
+      (probabilidad-nom atrib n valor)))
+
+(define (multiplica-lista lista)
+  (if (null? lista)
+      1.0
+      (* (car lista) (multiplica-lista (cdr lista)))))
+
+(define (PIC metaclase ejemplo-scla)
+  (let* ((meta-atribs (list-tail metaclase 2))
+         (n (list-ref metaclase 1))
+         (probs (map (lambda (x y) (prob-atrib x n y)) meta-atribs ejemplo-scla)))
+    probs))
+
+(define (PIC+ metaclase ejemplo-scla)
+  (let* ((meta-atribs (list-tail metaclase 2))
+         (n (list-ref metaclase 1))
+         (probs (map (lambda (x y) (prob-atrib x n y)) meta-atribs ejemplo-scla)))
+   (multiplica-lista probs)))
+
+(define (multiplica-listas l1 l2)
+  (if (null? l1)
+      '()
+      (cons (* (car l1) (car l2)) (multiplica-listas (cdr l1) (cdr l2)))))
+
+(define (divide-listas l1 l2)
+  (if (null? l1)
+      '()
+      (if (not (= (car l2) 0))
+          (cons (/ (car l1) (car l2)) (multiplica-listas (cdr l1) (cdr l2)))
+          (cons +inf.0 (multiplica-listas (cdr l1) (cdr l2))))))
+
+(define (multiplica-lista-de-listas l vacumulado)
+  (if (null? l)
+      vacumulado
+      (multiplica-lista-de-listas (cdr l) (multiplica-listas (car l) vacumulado))))
+ 
+         
+
+(define (PI concepto ejemplo-scla)
+  (let* ((prob-clases (map (lambda (x) (PIC x ejemplo-scla)) concepto))
+         (vprob-clases (multiplica-lista-de-listas prob-clases (build-list (length prob-clases) (lambda (x) 1.0)))))
+    vprob-clases))
+
+(define (PCI PC metaclase concepto ejemplo-scla)
+  (let* ((probIC (PIC metaclase ejemplo-scla))
+         (probI (PI concepto ejemplo-scla))
+         (vnumerador (map (lambda (x) (x * PC)) probIC)))
+    (divide-listas vnumerador PI)))
+
+(define (get-metaclase concepto clase)
+  (if (null? concepto)
+      '()
+      (if (eqv? (caar concepto) clase)
+          (car concepto)
+          (get-metaclase (cdr concepto) clase))))
+
+
+(define (probabilidades clase concepto-NB ejemplo-sin-clase)
+  (let* ((metaclase (get-metaclase concepto-NB clase))
+         (PC (/ (list-ref metaclase 1) (sum-list (map (lambda (x) (list-ref x 1)) concepto-NB))))
+         (vprobCI (PCI PC metaclase concepto-NB ejemplo-sin-clase)))
+    vprobCI))
+    
+        
+
+(distancia '(0 cocos 1 1) '(0 0 2 5 -))
+(distancia '(0 cocos 1 1) '(0 cocos 2 5 -))
+(distancia '(0 0 1 1) '(0 0 2 5 -))
 
 (define megaejemplos (mezclar ejemplos ejemplos2))
 (define PSET (get-PSET megaejemplos))
@@ -934,9 +1351,14 @@
 (define NSETcc (cons (car ejemplos) NSET))
 (define SPECS (delete-duplicates (egs-generate-specs (car HSET) (car ejemplos) NSET)))
 (define NEWSET2 (eval-SPECS SPECS (car HSET) PSETcc NSETcc '()))
+
+;(nuevo-conceptoNB metadatos)
+
 ;(score-CL (car HSET) PSETcc NSETcc)
 ;(list-ref SPECS 1)
 ;(score-CL (list-ref SPECS 1) PSETcc NSETcc)
+;(list-ref SPECS 1)
+;(score-TC (cons 1 '((soleado) (5 31) (23 80) (*) (bajo) (no))) PSETcc NSETcc)
 ;(match-TC '(4 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
 ;(match-TC '(3 (soleado)(*)(10 40)(si)) '(soleado 30 40 si))
 ;(match-TC '(2 (soleado)(*)(10 (40))(si)) '(soleado 30 40 si))
@@ -950,12 +1372,50 @@
 ;(TCi '(3 (soleado)(*)(10 40)(si)) '(30 soleado 25 si))
 ;(car (cdr ejemplos))
 ;(cons (length H) H)
-;(especializaciones-TC (cons 4 H) metadatos (car (cdr ejemplos)))
+;(especializaciones-TC (cons 3 H) metadatos (car (cdr ejemplos)))
+(define 1ejemplo (car (cdr ejemplos)))
+(define HUU (nuevo-conceptoUU metadatos 1))
+(define HUU+ (list (car HUU) (drop-right (cadr HUU) 1)))
+(set! HSET (cons '((*) (69 420) (*) (*) (*) (*)) HSET))
+;HSET
+;(generate-newset HSET NSET '() metadatos)
+1ejemplo
+
+(define concNB (nuevo-conceptoNB metadatos))
+;concNB
+(INB concNB 1ejemplo)
+(define conNBfull (NB ejemplos))
+(probabilidades '+ conNBfull (drop-right 1ejemplo 1))
+
+;(IBi ejemplos '(soleado 25 35 si medio no))
+;(match-IB ejemplos '(soleado 25 35 si medio no))
+;HUU
+;HUU+
+
+;(calcular-vector-gradiente HUU+ (cdr megaejemplos) (build-list (length (cadr HUU+)) (lambda (x) 0.0)))
+
+;(PRM HUU megaejemplos)
+;(PCP megaejemplos)
+;(LMS megaejemplos)
+;(cross-validation PCP LUUi lepiota 4)
+;(cross-validation LMS LUUi lepiota 3)
+;(match-LUU (list metadatos '(0 1 1 0 0 0 -105)) (drop-right 1ejemplo 1))
+;(match-LUU (list metadatos '(0 1 1 0 0 0 -106)) (drop-right 1ejemplo 1))
+
+;(LUUi (list metadatos '(0 1 1 0 0 0 -105)) (drop-right 1ejemplo 1))
+;(LUUi (list metadatos '(0 1 1 0 0 0 -106)) (drop-right 1ejemplo 1))
+
+;(create-full-counter '(1 2 3 3 3 2 1 1 1 1) '() 0)
+;(define contadores (list (cons 1 5) (cons 1 4) (cons 1 3) (cons 1 2)))
+;(contador>? (list-ref contadores 1) (list-ref contadores 0))
+
 
 ;(traducir '(perspectiva (soleado nublado lluvioso)) 'lluvioso)
 ;(traducir '(perspectiva numerico) '15)
-(nuevo-conceptoUU metadatos 3)
-
+;(nuevo-conceptoUU metadatos 3)
+;(car (cdr ejemplos))
+;metadatos
+;(traducir-ejemplo-sin-clase metadatos (drop-right (car (cdr ejemplos)) 1))
 ;lepiota
 ;ionosphere
 (trace HGS0)
@@ -989,7 +1449,7 @@
 ;(pasa-test? '((1) +inf.0) 1)
 ;(car (cdr ejemplos))
 ;(pasa-test? '((24) 25) 25)
-;(generalizaciones-atributo-numerico '((nublado) (0 60) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no +))
+;(generalizaciones-atributo-numerico '((nublado) (0 60) (80) (no) (medio) (no)) 1 '(nublado 83 83 no medio no +))
 ;(especializaciones-atributo-numerico '((nublado) (25) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no -))
 ;(especializaciones-atributo-numerico '((nublado) (0 60) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no -))
 ;(especializaciones-atributo-numerico '((nublado) ((0) (60)) (80) (no) (medio) (no)) 1 '(nublado 25 80 no medio no -))
